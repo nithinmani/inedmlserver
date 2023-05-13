@@ -1,8 +1,8 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify,request
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
-
+from datetime import datetime, timedelta
 import time
 import joblib
 import requests
@@ -18,10 +18,19 @@ from sklearn.ensemble import RandomForestRegressor
 import json
 from keras.callbacks import EarlyStopping
 
+from textblob import TextBlob
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+import newssent
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
+# load the NLTK VADER lexicon for sentiment analysis
+nltk.download('vader_lexicon')
 
+# initialize the sentiment analyzer
+sid = SentimentIntensityAnalyzer()
 
 
 def get_stocks(ticker):
@@ -251,6 +260,19 @@ def predict(ticker):
     print(ess)
     return jsonify({'predicted_prices': predicted_prices.tolist(), 'random': predicted_prices2.tolist(), 'combine': ess.tolist()})
 
+
+
+@app.route('/news_sentiment/<ticker>', methods=['GET'])
+def get_sentiment(ticker):
+    # Call the newssent function to get the sentiment scores
+    sentiment_df = newssent.newssentiment(ticker)
+
+    # Convert the DataFrame to a JSON object
+    sentiment_json = sentiment_df.to_json(orient='records')
+    print(sentiment_json)
+
+    # Return the JSON object
+    return jsonify(sentiment_json)
 
 if __name__ == '__main__':
 
