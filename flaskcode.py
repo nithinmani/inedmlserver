@@ -21,8 +21,9 @@ from keras.callbacks import EarlyStopping
 from textblob import TextBlob
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
+from model_test import load_and_predict
 import newssent
-import subprocess
+import sentiment
 
 app = Flask(__name__)
 CORS(app)
@@ -37,7 +38,7 @@ def get_stocks(ticker):
     url = f"https://yahoo-finance15.p.rapidapi.com/api/yahoo/hi/history/{ticker}/15m"
     querystring = {"diffandsplits": "false"}
     headers = {
-        "X-RapidAPI-Key": "0a47ceaf09msh3f22cd364c17590p160ab2jsnfe62bb61ad68",
+        "X-RapidAPI-Key": "080d5391a5msh8465fd7b03a93c4p1725e9jsnb512929f94b5",
         "X-RapidAPI-Host": "yahoo-finance15.p.rapidapi.com"
     }
     response = requests.request(
@@ -57,7 +58,7 @@ def get_recommendation_trend(ticker):
     url = f"https://yahoo-finance15.p.rapidapi.com/api/yahoo/qu/quote/{ticker}/recommendation-trend"
 
     headers = {
-        "X-RapidAPI-Key": "0a47ceaf09msh3f22cd364c17590p160ab2jsnfe62bb61ad68",
+        "X-RapidAPI-Key": "080d5391a5msh8465fd7b03a93c4p1725e9jsnb512929f94b5",
         "X-RapidAPI-Host": "yahoo-finance15.p.rapidapi.com"
     }
 
@@ -171,99 +172,17 @@ def get_aggressive_small_cap():
 
 @app.route('/api/predict/<ticker>', methods=['GET'])
 def predict(ticker):
-
-    data = yf.download(ticker, start="2018-01-01", end="2023-05-31")
-
-    data.to_csv('company.csv')
-    input_col = 'Close'
-
-    # Set the number of time steps to predict into the future
-    n_steps = 365
-
-    # Preprocess the data
-    scaler = MinMaxScaler()
-    scaled_data = scaler.fit_transform(data[[input_col]])
-    n_features = scaled_data.shape[1]
-
-    def create_sequences(data, sequence_length):
-        X, y = [], []
-        for i in range(len(data)-sequence_length-1):
-            X.append(data[i:(i+sequence_length), :])
-            y.append(data[(i+sequence_length), :])
-        return np.array(X), np.array(y)
-
-    sequence_length = 50
-    X, y = create_sequences(scaled_data, sequence_length)
-    train_size = int(0.80 * len(X))
-    X_train, y_train = X[:train_size], y[:train_size]
-    X_test, y_test = X[train_size:], y[train_size:]
-
-    # Define the LSTM model
-    # Define model architecture
-    from keras.optimizers import Adam
-
-    model = Sequential()
-    model.add(LSTM(64, return_sequences=True,
-              input_shape=(sequence_length, n_features)))
-
-    model.add(Dense(1))
-    model.compile(optimizer='adam', loss='mse')
-    model.summary()
-    # Train the LSTM model
-
-    model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=1)
-
-    last_sequence = X_test[-1]
-    predictions = []
-    for i in range(n_steps):
-        predicted_price = model.predict(
-            last_sequence.reshape(1, sequence_length, n_features))[0, 0]
-
-        predictions.append(predicted_price)
-
-        last_sequence = np.append(
-            last_sequence[1:], predicted_price.reshape((1, 1)), axis=0)
-
-    print(predictions)
-   
-    predicted_prices = scaler.inverse_transform(
-        np.array(predictions).reshape(-1, 1))
-
-    # Reshape the input and target arrays
-    X_train = X_train.reshape((X_train.shape[0], -1))
-    y_train = y_train.ravel()
-
-    # Create and train a random forest model
-    rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
-    rf_model.fit(X_train, y_train)
-
-    rf_predictions = []
-    last_sequence = X_test[-1][-n_steps:]
-    # reshape to match the size of last_sequence
-    last_sequence = last_sequence.reshape((1, last_sequence.shape[0]))
-    for i in range(n_steps):
-        rf_prediction = rf_model.predict(
-            last_sequence.reshape((1, last_sequence.shape[1])))
-        rf_predictions.append(rf_prediction[0])
-        last_sequence = np.append(
-            last_sequence[:, 1:], rf_prediction.reshape((1, 1)), axis=1)
-
-    predicted_prices2 = scaler.inverse_transform(
-        np.array(rf_predictions).reshape(-1, 1))
-
-    ensemble_predictions = []
-    for lstm_pred, rf_pred in zip(predictions, rf_predictions):
-        ensemble_pred = (lstm_pred + rf_pred) / 2.0
-        ensemble_predictions.append(ensemble_pred)
-    print(ensemble_predictions)
-    ess = scaler.inverse_transform(ensemble_predictions)
-    print(ess)
+    predicted_prices, predicted_prices2, ess = load_and_predict(ticker)
     return jsonify({'predicted_prices': predicted_prices.tolist(), 'random': predicted_prices2.tolist(), 'combine': ess.tolist()})
 
 
 
-@app.route('/news_sentiment/<ticker>', methods=['GET'])
-def get_sentiment(ticker):
+
+
+
+
+@app.route('/hist_sentiment/<ticker>', methods=['GET'])
+def hist_sentiment(ticker):
     # Call the newssent function to get the sentiment scores
     sentiment_df = newssent.newssentiment(ticker)
 
@@ -273,6 +192,23 @@ def get_sentiment(ticker):
 
     # Return the JSON object
     return jsonify(sentiment_json)
+
+import json
+
+import json
+import numpy as np
+
+@app.route('/news_sentiment/<ticker>', methods=['GET'])
+def get_sentiment(ticker):
+    # Call the newssent function to get the sentiment scores
+    sentiment_df = sentiment.newssentiment(ticker)
+
+    # Convert the NumPy array to a Python list
+    sentiment_list = sentiment_df.tolist()
+
+    # Return the JSON object
+    return json.dumps(sentiment_list)
+
 
 if __name__ == '__main__':
 
