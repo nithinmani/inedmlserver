@@ -195,7 +195,6 @@ def hist_sentiment(ticker):
 
 import json
 
-import json
 import numpy as np
 
 @app.route('/news_sentiment/<ticker>', methods=['GET'])
