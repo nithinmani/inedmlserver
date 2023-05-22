@@ -6,9 +6,7 @@ from datetime import datetime, timedelta
 import time
 import joblib
 import requests
-
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
@@ -24,15 +22,11 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from model_test import load_and_predict
 import newssent
 import sentiment
+import waitress
 
 app = Flask(__name__)
 CORS(app)
 # load the NLTK VADER lexicon for sentiment analysis
-nltk.download('vader_lexicon')
-
-# initialize the sentiment analyzer
-sid = SentimentIntensityAnalyzer()
-
 
 def get_stocks(ticker):
     url = f"https://yahoo-finance15.p.rapidapi.com/api/yahoo/hi/history/{ticker}/15m"
@@ -210,5 +204,6 @@ def get_sentiment(ticker):
 
 
 if __name__ == '__main__':
+    
+    waitress.serve(app, host='0.0.0.0', port=5000)
 
-    app.run(port=5000)
