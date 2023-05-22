@@ -22,7 +22,6 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from model_test import load_and_predict
 import newssent
 import sentiment
-import waitress
 
 app = Flask(__name__)
 CORS(app)
@@ -204,6 +203,5 @@ def get_sentiment(ticker):
 
 
 if __name__ == '__main__':
-    
-    waitress.serve(app, host='0.0.0.0', port=5000)
+    app.run(port=5000)
 
